@@ -32,12 +32,14 @@ const struct
 
 
 #include <stdio.h>
+#include <string>
+
+using std::string;
 
 
 /*
   Constants:
 */
-
 
 
 
@@ -52,6 +54,11 @@ void check_ft_error(const FT_Error error, const char* filename, const int line);
  */
 void copy_font_bitmap(unsigned char atlas_buffer[], FT_Bitmap bitmap,
 		      unsigned int start_x, unsigned int start_y);
+
+// Strip the file extension from a file name.
+// If for instance str = "file.txt", then "file" will be returned.
+string strip_file_extension(const string& str);
+
 
 
 /*
@@ -84,7 +91,6 @@ const unsigned int atlas_height = 1024;
 
 
 
-
 int main() {
 
     FT_Library  library;
@@ -92,10 +98,17 @@ int main() {
 
     FT_C(FT_Init_FreeType( &library ));
 
+    const string input_file = "./Ubuntu-B.ttf";
+
     FT_C(FT_New_Face( library,
-		      "./Ubuntu-B.ttf",
+		      input_file.c_str(),
 		      0, // face index. We'll be assuming there is only one face in the file.
 		      &face ));
+
+    // all files outputted by this program will start with this string.
+    const string output_file_prefix = strip_file_extension(input_file);
+
+    printf("out %s", output_file_prefix.c_str());
 
     if(face->num_faces != 1) {
 	printf("This file has %ld font face(s), but this program only supports one face/n", face->num_faces);
@@ -163,6 +176,9 @@ int main() {
 	}
     }
 
+
+    FILE* fp = fopen((output_file_prefix+string(".amf")).c_str(), "w");
+
     unsigned int max_height = max_bitmap_top + max_rows;
 
     unsigned int atlas_x = 0;
@@ -179,6 +195,7 @@ int main() {
 	FT_Bitmap bitmap = glyph->bitmap;
 
 	const unsigned int bitmap_width = bitmap.width;
+	const unsigned int bitmap_height = bitmap.rows;
 
 	// start a new row, if the current one is already filled.
 	if(bitmap_width + atlas_x > atlas_width) {
@@ -189,13 +206,32 @@ int main() {
 	// ensure that the characters are not crammed together
 	atlas_x += glyph->bitmap_left;
 
+
+
+
 	copy_font_bitmap(atlas_buffer, bitmap, atlas_x, atlas_y + max_bitmap_top - glyph->bitmap_top);
+
+	string line =
+	    string(1,(char)ch) + "," +
+	    std::to_string(atlas_x) + "," +
+	    std::to_string(atlas_y + max_bitmap_top - glyph->bitmap_top) + "," +
+	    std::to_string(bitmap_width) + "," +
+	    std::to_string(bitmap_height) +
+
+	    "\n";
+
+	fputs(line.c_str(), fp);
+
+
 
 	// move to the next letter.
 	atlas_x += bitmap_width;
     }
 
-    unsigned int error = lodepng_encode32_file("out.png", atlas_buffer, atlas_width, atlas_height);
+
+
+
+    unsigned int error = lodepng_encode32_file((output_file_prefix+string(".png")).c_str(), atlas_buffer, atlas_width, atlas_height);
 
 
     /*if there's an error, display it*/
@@ -203,6 +239,7 @@ int main() {
 	printf("error %u: %s\n", error, lodepng_error_text(error));
 	exit(1);
     }
+    fclose(fp);
 
     system("open out.png");
 }
@@ -271,4 +308,11 @@ void copy_font_bitmap(unsigned char atlas_buffer[], FT_Bitmap bitmap,
 	}
 
     }
+}
+
+
+string strip_file_extension(const string& str) {
+    size_t last_dot = str.find_last_of(".");
+
+    return str.substr(0,last_dot);
 }
