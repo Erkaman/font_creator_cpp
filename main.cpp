@@ -39,15 +39,19 @@ const struct
 */
 
 
-// horizontal and vertical resolution in DPI
-#define RESOLUTION 72
 
 
 /*
   Function definitions:
 */
 
-    void CheckFTError(const FT_Error error, const char* filename, const int line);
+void check_ft_error(const FT_Error error, const char* filename, const int line);
+
+/*
+  Copy the font bitmap into the atlas buffer, starting at the pixel coordinates (start_x,start_y)
+ */
+void copy_font_bitmap(unsigned char atlas_buffer[], FT_Bitmap bitmap,
+		      unsigned int start_x, unsigned int start_y);
 
 
 /*
@@ -57,16 +61,31 @@ const struct
 */
 #define FT_C(stmt) do {					\
 	FT_Error error = stmt;				\
-	CheckFTError(error, __FILE__, __LINE__);	\
+	check_ft_error(error, __FILE__, __LINE__);	\
     } while (0)
 
+
+// horizontal and vertical resolution in DPI
+#define RESOLUTION 72
+
+#define START_CHAR 32
+#define END_CHAR 90
+
+// the spacing between rows of characters in the atlas.
+#define ROW_SPACING 10
+
+
+/*
+  Global variables.
+ */
+const FT_F26Dot6 font_size = 64;
+const unsigned int atlas_width = 1024;
+const unsigned int atlas_height = 1024;
+
+
+
+
 int main() {
-
-    const FT_F26Dot6 font_size = 64;
-    const unsigned int atlas_width = 1024;
-    const unsigned int atlas_height = 1024;
-
-
 
     FT_Library  library;
     FT_Face     face;
@@ -79,12 +98,9 @@ int main() {
 		      &face ));
 
     if(face->num_faces != 1) {
-
 	printf("This file has %ld font face(s), but this program only supports one face/n", face->num_faces);
 	exit(1);
-
     }
-
 
     // set the font size.
     FT_C(FT_Set_Char_Size(
@@ -94,31 +110,92 @@ int main() {
 	     RESOLUTION,     /* horizontal device resolution    */
 	     RESOLUTION ));   /* vertical device resolution      */
 
-    FT_C(FT_Load_Char(face, 'A', FT_LOAD_RENDER));
-
-    FT_GlyphSlot g = face->glyph;
-    FT_Bitmap bm = g->bitmap;
-
-    unsigned int width = bm.width;
-    unsigned int height = bm.rows;
-    unsigned int num_pixels = width * height;
+    unsigned int atlas_num_pixels = atlas_width * atlas_height;
 
     //contains REBA values, with a byte for each channel.
-    unsigned char* png_buffer = new unsigned char[num_pixels * 4];
+    unsigned char* atlas_buffer = new unsigned char[atlas_num_pixels * 4];
 
-    for(unsigned int i = 0; i < num_pixels; ++i) {
-	// for this value, a value of 255, means fully opaque.
-	// 0 means fully transparent.
-	// so it is the alpha value.
-	unsigned char a = bm.buffer[i];
-
-	png_buffer[4*i + 0] = 255;
-	png_buffer[4*i + 1] = 255;
-	png_buffer[4*i + 2] = 255;
-	png_buffer[4*i + 3] = a;
+    // initially, set all atlas pixels to fully transparent white: (1,1,1,0).
+    for(int i = 0; i < atlas_num_pixels; ++i) {
+	atlas_buffer[4*i + 0] = 255;
+	atlas_buffer[4*i + 1] = 255;
+	atlas_buffer[4*i + 2] = 255;
+	atlas_buffer[4*i + 3] = 0;
     }
 
-    unsigned int error = lodepng_encode32_file("out.png", png_buffer, width, height);
+
+    // the maximum distance from the baseline to the topmost scanline(row) of a bitmap.
+    unsigned int max_bitmap_top = 0;
+    // the minimum distance from the baseline to the bottom most scanline(row) of a bitmap.
+    unsigned int max_bitmap_bottom = 0;
+    //(and clearly, the sum of these two will be the max height of any character.)
+
+    unsigned int max_rows = 0;
+
+    for(unsigned int ch = START_CHAR; ch <= END_CHAR; ++ch) {
+
+
+	FT_C(FT_Load_Char(face, (char)ch, FT_LOAD_RENDER));
+
+	FT_GlyphSlot glyph = face->glyph;
+	FT_Bitmap bitmap = glyph->bitmap;
+
+//	printf("height: %d\n", face->size->metrics.height );
+
+	if(glyph->bitmap_top > max_bitmap_top) {
+/*	    printf("new max top %c\n", (char)ch);
+
+	    printf("new max top %d \n", glyph->bitmap_top);
+*/
+	    max_bitmap_top = glyph->bitmap_top;
+	}
+
+	if((bitmap.rows - glyph->bitmap_top) > max_bitmap_bottom) {
+	    /*   printf("new max bottom %c \n", (char)ch);
+
+	    printf("new max bottom %d = %d \n", bitmap.rows, glyph->bitmap_top);
+	    */
+	    max_bitmap_bottom = bitmap.rows - glyph->bitmap_top;
+	}
+
+	if(bitmap.rows > max_rows) {
+	    max_rows = bitmap.rows;
+	}
+    }
+
+    unsigned int max_height = max_bitmap_top + max_rows;
+
+    unsigned int atlas_x = 0;
+    unsigned int atlas_y = 0;
+
+    // find max ascender(face.glyph.bitmap_top)
+    // then use simple formula.
+
+    for(unsigned int ch = START_CHAR; ch <= END_CHAR; ++ch) {
+
+	FT_C(FT_Load_Char(face, (char)ch, FT_LOAD_RENDER));
+
+	FT_GlyphSlot glyph = face->glyph;
+	FT_Bitmap bitmap = glyph->bitmap;
+
+	const unsigned int bitmap_width = bitmap.width;
+
+	// start a new row, if the current one is already filled.
+	if(bitmap_width + atlas_x > atlas_width) {
+	    atlas_x = 0;
+	    atlas_y += max_height+ROW_SPACING;
+	}
+
+	// ensure that the characters are not crammed together
+	atlas_x += glyph->bitmap_left;
+
+	copy_font_bitmap(atlas_buffer, bitmap, atlas_x, atlas_y + max_bitmap_top - glyph->bitmap_top);
+
+	// move to the next letter.
+	atlas_x += bitmap_width;
+    }
+
+    unsigned int error = lodepng_encode32_file("out.png", atlas_buffer, atlas_width, atlas_height);
 
 
     /*if there's an error, display it*/
@@ -127,23 +204,14 @@ int main() {
 	exit(1);
     }
 
-    /*
-        //Encode the image
-    unsigned error = lodepng::encode(filename, pixels, width, height);
-
-
-  //if there's an error, display it
-   if(error)
-      LOG_E("PNG encoder error: %d: %s", error, lodepng_error_text(error) );
-
-    */
+    system("open out.png");
 }
 
 /*
   If no FT error, do nothing.
   Else, print FT error message, and shut down.
 */
-void CheckFTError(const FT_Error error, const char* filename, const int line) {
+void check_ft_error(const FT_Error error, const char* filename, const int line) {
     if(error == 0) {
 	// no error.
 	return;
@@ -158,3 +226,49 @@ void CheckFTError(const FT_Error error, const char* filename, const int line) {
 }
 
 // 954
+
+void copy_font_bitmap(unsigned char atlas_buffer[], FT_Bitmap bitmap,
+		      unsigned int start_x, unsigned int start_y) {
+
+    // atlas row width in bytes.
+    unsigned int atlas_row_size = atlas_width * 4;
+
+    unsigned int atlas_i = atlas_row_size * start_y + start_x * 4;
+
+    const unsigned int bitmap_width = bitmap.width;
+    const unsigned int bitmap_height = bitmap.rows;
+    const unsigned int bitmap_num_pixels = bitmap_width * bitmap_height;
+
+    unsigned int bitmap_x = 0;
+
+    /* printf("bitmap_width: %d\n", bitmap_width);
+    printf("bitmap_height: %d\n", bitmap_height);
+    */
+    for(int bitmap_i = 0; bitmap_i < bitmap_num_pixels; ++bitmap_i) {
+
+	// for this value, a value of 255, means fully opaque.
+	// 0 means fully transparent.
+	// so it is the alpha value.
+	unsigned char a = bitmap.buffer[bitmap_i];
+
+//	("atlias_i %d\n", atlas_i);
+
+	atlas_buffer[atlas_i + 0] = 255;
+	atlas_buffer[atlas_i + 1] = 0;
+	atlas_buffer[atlas_i + 2] = 255;
+	atlas_buffer[atlas_i + 3] = a;
+
+	if( ( (bitmap_i+1) % bitmap_width) ==0 && bitmap_i != 0 ) {
+	    // new row:
+	    atlas_i += atlas_row_size - 4 * bitmap_width + 4;
+//	    printf("FLIP\n");
+//	    printf("atlas_i: %d\n", atlas_i);
+
+	} else {
+	    atlas_i += 4;
+//	    printf("atlas_i: %d\n", atlas_i);
+
+	}
+
+    }
+}
