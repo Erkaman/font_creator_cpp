@@ -76,7 +76,7 @@ string strip_file_extension(const string& str);
 #define RESOLUTION 72
 
 #define START_CHAR 32
-#define END_CHAR 90
+#define END_CHAR 90 // 90
 
 // the spacing between rows of characters in the atlas.
 #define ROW_SPACING 10
@@ -239,7 +239,14 @@ int main() {
 	printf("error %u: %s\n", error, lodepng_error_text(error));
 	exit(1);
     }
+
+    /*
+      Clean up
+     */
+
     fclose(fp);
+    delete[] atlas_buffer;
+    FT_C(FT_Done_FreeType( library ));
 
     system("open out.png");
 }

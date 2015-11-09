@@ -1,3 +1,5 @@
 *.ttf
 a.out
 *.png
+*.amf
+*.dSym/
