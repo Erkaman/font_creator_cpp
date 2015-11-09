@@ -59,6 +59,12 @@ void copy_font_bitmap(unsigned char atlas_buffer[], FT_Bitmap bitmap,
 // If for instance str = "file.txt", then "file" will be returned.
 string strip_file_extension(const string& str);
 
+/*
+Given the maximum width and height of all characters bitmaps, find an atlas size
+that will fit all characters, yet is, approximately, as small as possible.
+ */
+unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height);
+
 
 
 /*
@@ -76,20 +82,17 @@ string strip_file_extension(const string& str);
 #define RESOLUTION 72
 
 #define START_CHAR 32
-#define END_CHAR 90 // 90
+#define END_CHAR 95 // 90
 
 // the spacing between rows of characters in the atlas.
 #define ROW_SPACING 10
-
 
 /*
   Global variables.
  */
 const FT_F26Dot6 font_size = 64;
-const unsigned int atlas_width = 1024;
-const unsigned int atlas_height = 1024;
-
-
+unsigned int atlas_width;
+unsigned int atlas_height;
 
 int main() {
 
@@ -108,12 +111,22 @@ int main() {
     // all files outputted by this program will start with this string.
     const string output_file_prefix = strip_file_extension(input_file);
 
-    printf("out %s", output_file_prefix.c_str());
-
     if(face->num_faces != 1) {
 	printf("This file has %ld font face(s), but this program only supports one face/n", face->num_faces);
 	exit(1);
     }
+
+
+
+
+
+
+
+
+
+
+
+
 
     // set the font size.
     FT_C(FT_Set_Char_Size(
@@ -122,6 +135,57 @@ int main() {
 	     0,   //char_height. It is 0, so it is set to char_width
 	     RESOLUTION,     /* horizontal device resolution    */
 	     RESOLUTION ));   /* vertical device resolution      */
+
+
+
+
+    /*
+      Next, we determine the size of the atlas.
+     */
+
+    unsigned int max_width = 0;
+    unsigned int max_height = 0;
+
+
+    for(unsigned int ch = START_CHAR; ch <= END_CHAR; ++ch) {
+
+	FT_C(FT_Load_Char(face, (char)ch, FT_LOAD_RENDER));
+
+	FT_GlyphSlot glyph = face->glyph;
+	FT_Bitmap bitmap = glyph->bitmap;
+
+	if(bitmap.rows > max_height) {
+	    max_height = bitmap.rows;
+	}
+
+	if(bitmap.width > max_width) {
+	    max_width = bitmap.width;
+	}
+    }
+
+    printf("atlas_width: %d\n", atlas_width);
+    printf("atlas_height: %d\n", atlas_height);
+
+    printf("max_width: %d\n", max_width);
+    printf("max_height: %d\n", max_height);
+
+    atlas_width = find_atlas_size(max_width, max_height);
+    atlas_height = atlas_width;
+
+
+/*    atlas_width = 1024;
+    atlas_height = 1024;
+*/
+
+
+//    find_atlas_size(max_width, max_height);
+
+    /*
+      Allocate the atlas pixel buffer.
+     */
+
+    printf("atlas width: %d\n", atlas_width);
+    printf("atlas heigit: %d\n", atlas_height);
 
     unsigned int atlas_num_pixels = atlas_width * atlas_height;
 
@@ -137,55 +201,14 @@ int main() {
     }
 
 
-    // the maximum distance from the baseline to the topmost scanline(row) of a bitmap.
-    unsigned int max_bitmap_top = 0;
-    // the minimum distance from the baseline to the bottom most scanline(row) of a bitmap.
-    unsigned int max_bitmap_bottom = 0;
-    //(and clearly, the sum of these two will be the max height of any character.)
-
-    unsigned int max_rows = 0;
-
-    for(unsigned int ch = START_CHAR; ch <= END_CHAR; ++ch) {
-
-
-	FT_C(FT_Load_Char(face, (char)ch, FT_LOAD_RENDER));
-
-	FT_GlyphSlot glyph = face->glyph;
-	FT_Bitmap bitmap = glyph->bitmap;
-
-//	printf("height: %d\n", face->size->metrics.height );
-
-	if(glyph->bitmap_top > max_bitmap_top) {
-/*	    printf("new max top %c\n", (char)ch);
-
-	    printf("new max top %d \n", glyph->bitmap_top);
-*/
-	    max_bitmap_top = glyph->bitmap_top;
-	}
-
-	if((bitmap.rows - glyph->bitmap_top) > max_bitmap_bottom) {
-	    /*   printf("new max bottom %c \n", (char)ch);
-
-	    printf("new max bottom %d = %d \n", bitmap.rows, glyph->bitmap_top);
-	    */
-	    max_bitmap_bottom = bitmap.rows - glyph->bitmap_top;
-	}
-
-	if(bitmap.rows > max_rows) {
-	    max_rows = bitmap.rows;
-	}
-    }
 
 
     FILE* fp = fopen((output_file_prefix+string(".amf")).c_str(), "w");
 
-    unsigned int max_height = max_bitmap_top + max_rows;
+    //unsigned int max_height = max_bitmap_top + max_rows;
 
     unsigned int atlas_x = 0;
     unsigned int atlas_y = 0;
-
-    // find max ascender(face.glyph.bitmap_top)
-    // then use simple formula.
 
     for(unsigned int ch = START_CHAR; ch <= END_CHAR; ++ch) {
 
@@ -200,21 +223,19 @@ int main() {
 	// start a new row, if the current one is already filled.
 	if(bitmap_width + atlas_x > atlas_width) {
 	    atlas_x = 0;
-	    atlas_y += max_height+ROW_SPACING;
+
+	    atlas_y += max_height/*+ROW_SPACING*/;
 	}
 
 	// ensure that the characters are not crammed together
 	atlas_x += glyph->bitmap_left;
 
-
-
-
-	copy_font_bitmap(atlas_buffer, bitmap, atlas_x, atlas_y + max_bitmap_top - glyph->bitmap_top);
+	copy_font_bitmap(atlas_buffer, bitmap, atlas_x, atlas_y/* + max_bitmap_top - glyph->bitmap_top*/);
 
 	string line =
 	    string(1,(char)ch) + "," +
 	    std::to_string(atlas_x) + "," +
-	    std::to_string(atlas_y + max_bitmap_top - glyph->bitmap_top) + "," +
+	    std::to_string(atlas_y) + "," +
 	    std::to_string(bitmap_width) + "," +
 	    std::to_string(bitmap_height) +
 
@@ -248,7 +269,7 @@ int main() {
     delete[] atlas_buffer;
     FT_C(FT_Done_FreeType( library ));
 
-    system("open out.png");
+    system("open Ubuntu-B.png");
 }
 
 /*
@@ -277,7 +298,14 @@ void copy_font_bitmap(unsigned char atlas_buffer[], FT_Bitmap bitmap,
     // atlas row width in bytes.
     unsigned int atlas_row_size = atlas_width * 4;
 
+    //printf("atlas_row_size: %d\n", atlas_row_size);
+//    printf("start_y: %d\n", start_y);
+
     unsigned int atlas_i = atlas_row_size * start_y + start_x * 4;
+//    printf("atlas_i: %d\n", atlas_i);
+
+
+
 
     const unsigned int bitmap_width = bitmap.width;
     const unsigned int bitmap_height = bitmap.rows;
@@ -296,6 +324,8 @@ void copy_font_bitmap(unsigned char atlas_buffer[], FT_Bitmap bitmap,
 	unsigned char a = bitmap.buffer[bitmap_i];
 
 //	("atlias_i %d\n", atlas_i);
+
+//	printf("atlas_i: %d\n", atlas_i);
 
 	atlas_buffer[atlas_i + 0] = 255;
 	atlas_buffer[atlas_i + 1] = 0;
@@ -322,4 +352,36 @@ string strip_file_extension(const string& str) {
     size_t last_dot = str.find_last_of(".");
 
     return str.substr(0,last_dot);
+}
+
+unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height) {
+
+    // an atlas smaller than 128x128 will probably not exist :)
+    unsigned int atlas_size = 128;
+
+    while(true) {
+
+	unsigned int total_width = max_width * (END_CHAR - START_CHAR);
+
+	unsigned int rows = total_width / atlas_size;
+
+	printf("atlas_size: %d\n",  atlas_size);
+
+	if(rows < 1) {
+	    printf("WAT\n");
+	    exit(1);
+	}
+
+	if(rows * max_height < atlas_size) {
+	    // enough rows. Found an atlas size big enough.
+	    break;
+	}
+
+	atlas_size *= 2;
+
+    }
+
+
+    return atlas_size;
+
 }
