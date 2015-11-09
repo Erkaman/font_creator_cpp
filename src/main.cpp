@@ -101,7 +101,7 @@ int main() {
 
     FT_C(FT_Init_FreeType( &library ));
 
-    const string input_file = "./Ubuntu-B.ttf";
+    const string input_file = "../Ubuntu-B.ttf";
 
     FT_C(FT_New_Face( library,
 		      input_file.c_str(),

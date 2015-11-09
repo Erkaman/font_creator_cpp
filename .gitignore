@@ -3,3 +3,4 @@ a.out
 *.png
 *.amf
 *.dSym/
+build/
