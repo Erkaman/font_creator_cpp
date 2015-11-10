@@ -112,7 +112,7 @@ void print_help();
 #define RESOLUTION 72
 
 #define START_CHAR 32
-#define END_CHAR 95 // 90
+#define END_CHAR 120 // 90
 
 #define FONT_SIZE_DEFALT 64
 
@@ -179,7 +179,7 @@ int main(int argc, char *argv[] ) {
 
 
     // all files outputted by this program will start with this string.
-    const string output_file_prefix = strip_file_extension(input_file);
+    const string output_file_prefix = strip_file_extension(input_file) + string("-") + std::to_string(font_size);
 
 
     FT_C(FT_New_Face( library,
@@ -208,7 +208,7 @@ int main(int argc, char *argv[] ) {
 
     unsigned int max_width = 0;
     unsigned int max_height = 0;
-
+    unsigned int max_bitmap_top;
 
     for(unsigned int ch = START_CHAR; ch <= END_CHAR; ++ch) {
 
@@ -223,6 +223,10 @@ int main(int argc, char *argv[] ) {
 
 	if(bitmap.width > max_width) {
 	    max_width = bitmap.width;
+	}
+
+	if(glyph->bitmap_top > max_bitmap_top) {
+	    max_bitmap_top = glyph->bitmap_top;
 	}
     }
 
@@ -274,10 +278,15 @@ int main(int argc, char *argv[] ) {
 	    atlas_y += max_height/*+ROW_SPACING*/;
 	}
 
-	// ensure that the characters are not crammed together
-	atlas_x += glyph->bitmap_left;
+//	printf("ch: %c, %d\n", (char)ch, glyph->bitmap_left);
 
-	copy_font_bitmap(atlas_buffer, bitmap, atlas_x, atlas_y/* + max_bitmap_top - glyph->bitmap_top*/);
+	// ensure that the characters are not crammed together
+//	atlas_x += glyph->bitmap_left;
+
+	copy_font_bitmap(atlas_buffer, bitmap, atlas_x, atlas_y
+
+			 /*+ max_bitmap_top - glyph->bitmap_top*/
+	    );
 
 	string line =
 	    string(1,(char)ch) + "," +
@@ -290,10 +299,8 @@ int main(int argc, char *argv[] ) {
 
 	fputs(line.c_str(), fp);
 
-
-
 	// move to the next letter.
-	atlas_x += bitmap_width;
+	atlas_x += max_width;
     }
 
 
@@ -315,7 +322,7 @@ int main(int argc, char *argv[] ) {
     delete[] atlas_buffer;
     FT_C(FT_Done_FreeType( library ));
 
-    system("open ../Ubuntu-B.png");
+    system(("open " + output_file_prefix+string(".png")).c_str() );
 }
 
 void check_ft_error(const FT_Error error, const char* filename, const int line) {
