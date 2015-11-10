@@ -26,9 +26,6 @@ THE SOFTWARE.
 */
 
 
-
-
-
 /*
   include FT.
 */
@@ -50,6 +47,7 @@ const struct
     const char*  err_msg;
 } ft_errors[] =
 #include FT_ERRORS_H
+;
 /*
   ft_errors can now be used to find an error message for all FT errors.
 */
@@ -60,7 +58,9 @@ const struct
  */
 #include "lodepng.h"
 
-
+/*
+  Include standard library headers.
+ */
 
 #include <stdio.h>
 #include <string>
@@ -69,15 +69,13 @@ using std::string;
 
 
 /*
-  Constants:
-*/
-
-
-
-/*
   Function definitions:
 */
 
+/*
+  If no FT error, do nothing.
+  Else, print FT error message, and shut down.
+*/
 void check_ft_error(const FT_Error error, const char* filename, const int line);
 
 /*
@@ -96,8 +94,6 @@ that will fit all characters, yet is, approximately, as small as possible.
  */
 unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height);
 
-
-
 /*
   FreeType-Check
 
@@ -115,49 +111,46 @@ unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height);
 #define START_CHAR 32
 #define END_CHAR 95 // 90
 
-// the spacing between rows of characters in the atlas.
-#define ROW_SPACING 10
 
 /*
   Global variables.
  */
-const FT_F26Dot6 font_size = 64;
 unsigned int atlas_width;
 unsigned int atlas_height;
 
 int main() {
 
+    const FT_F26Dot6 font_size = 64;
+
+
     FT_Library  library;
     FT_Face     face;
 
+    // Init FT
     FT_C(FT_Init_FreeType( &library ));
 
+
+
+    /*
+      Load the font file.
+     */
+
     const string input_file = "../Ubuntu-B.ttf";
+
+    // all files outputted by this program will start with this string.
+    const string output_file_prefix = strip_file_extension(input_file);
+
 
     FT_C(FT_New_Face( library,
 		      input_file.c_str(),
 		      0, // face index. We'll be assuming there is only one face in the file.
 		      &face ));
 
-    // all files outputted by this program will start with this string.
-    const string output_file_prefix = strip_file_extension(input_file);
 
     if(face->num_faces != 1) {
 	printf("This file has %ld font face(s), but this program only supports one face/n", face->num_faces);
 	exit(1);
     }
-
-
-
-
-
-
-
-
-
-
-
-
 
     // set the font size.
     FT_C(FT_Set_Char_Size(
@@ -168,10 +161,8 @@ int main() {
 	     RESOLUTION ));   /* vertical device resolution      */
 
 
-
-
     /*
-      Next, we determine the size of the atlas.
+      Next, we determine the size of the atlas, so that it will fit all the characters.
      */
 
     unsigned int max_width = 0;
@@ -194,33 +185,18 @@ int main() {
 	}
     }
 
-    printf("atlas_width: %d\n", atlas_width);
-    printf("atlas_height: %d\n", atlas_height);
-
-    printf("max_width: %d\n", max_width);
-    printf("max_height: %d\n", max_height);
-
     atlas_width = find_atlas_size(max_width, max_height);
     atlas_height = atlas_width;
 
 
-/*    atlas_width = 1024;
-    atlas_height = 1024;
-*/
-
-
-//    find_atlas_size(max_width, max_height);
 
     /*
       Allocate the atlas pixel buffer.
-     */
-
-    printf("atlas width: %d\n", atlas_width);
-    printf("atlas heigit: %d\n", atlas_height);
+    */
 
     unsigned int atlas_num_pixels = atlas_width * atlas_height;
 
-    //contains REBA values, with a byte for each channel.
+    //contains RGBA values, with a byte for each channel.
     unsigned char* atlas_buffer = new unsigned char[atlas_num_pixels * 4];
 
     // initially, set all atlas pixels to fully transparent white: (1,1,1,0).
@@ -295,18 +271,13 @@ int main() {
     /*
       Clean up
      */
-
     fclose(fp);
     delete[] atlas_buffer;
     FT_C(FT_Done_FreeType( library ));
 
-    system("open Ubuntu-B.png");
+    system("open ../Ubuntu-B.png");
 }
 
-/*
-  If no FT error, do nothing.
-  Else, print FT error message, and shut down.
-*/
 void check_ft_error(const FT_Error error, const char* filename, const int line) {
     if(error == 0) {
 	// no error.
@@ -321,22 +292,13 @@ void check_ft_error(const FT_Error error, const char* filename, const int line) 
     exit(1);
 }
 
-// 954
-
 void copy_font_bitmap(unsigned char atlas_buffer[], FT_Bitmap bitmap,
 		      unsigned int start_x, unsigned int start_y) {
 
     // atlas row width in bytes.
     unsigned int atlas_row_size = atlas_width * 4;
 
-    //printf("atlas_row_size: %d\n", atlas_row_size);
-//    printf("start_y: %d\n", start_y);
-
     unsigned int atlas_i = atlas_row_size * start_y + start_x * 4;
-//    printf("atlas_i: %d\n", atlas_i);
-
-
-
 
     const unsigned int bitmap_width = bitmap.width;
     const unsigned int bitmap_height = bitmap.rows;
@@ -344,9 +306,6 @@ void copy_font_bitmap(unsigned char atlas_buffer[], FT_Bitmap bitmap,
 
     unsigned int bitmap_x = 0;
 
-    /* printf("bitmap_width: %d\n", bitmap_width);
-    printf("bitmap_height: %d\n", bitmap_height);
-    */
     for(int bitmap_i = 0; bitmap_i < bitmap_num_pixels; ++bitmap_i) {
 
 	// for this value, a value of 255, means fully opaque.
@@ -354,25 +313,16 @@ void copy_font_bitmap(unsigned char atlas_buffer[], FT_Bitmap bitmap,
 	// so it is the alpha value.
 	unsigned char a = bitmap.buffer[bitmap_i];
 
-//	("atlias_i %d\n", atlas_i);
-
-//	printf("atlas_i: %d\n", atlas_i);
-
 	atlas_buffer[atlas_i + 0] = 255;
 	atlas_buffer[atlas_i + 1] = 0;
 	atlas_buffer[atlas_i + 2] = 255;
 	atlas_buffer[atlas_i + 3] = a;
 
 	if( ( (bitmap_i+1) % bitmap_width) ==0 && bitmap_i != 0 ) {
-	    // new row:
+	    // start new row:
 	    atlas_i += atlas_row_size - 4 * bitmap_width + 4;
-//	    printf("FLIP\n");
-//	    printf("atlas_i: %d\n", atlas_i);
-
 	} else {
 	    atlas_i += 4;
-//	    printf("atlas_i: %d\n", atlas_i);
-
 	}
 
     }
@@ -392,24 +342,17 @@ unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height) {
 
     while(true) {
 
+	// total amount of vertical space required for all characters.
 	unsigned int total_width = max_width * (END_CHAR - START_CHAR);
 
 	unsigned int rows = total_width / atlas_size;
 
-	printf("atlas_size: %d\n",  atlas_size);
-
-	if(rows < 1) {
-	    printf("WAT\n");
-	    exit(1);
-	}
-
 	if(rows * max_height < atlas_size) {
-	    // enough rows. Found an atlas size big enough.
+	    // enough rows. So we found an atlas size big enough.
 	    break;
 	}
 
 	atlas_size *= 2;
-
     }
 
 

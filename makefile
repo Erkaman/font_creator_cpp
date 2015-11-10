@@ -1,2 +1,2 @@
 ll:
-	g++ -g -I /opt/X11/include/freetype2 -I deps -lfreetype main.cpp deps/lodepng.cpp && ./a.out
+	cd build && make && ./font_creator_cpp ../Ubuntu-B.ttf
