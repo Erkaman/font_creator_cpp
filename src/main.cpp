@@ -64,6 +64,7 @@ const struct
 
 #include <stdio.h>
 #include <string>
+#include <string.h>
 
 using std::string;
 
@@ -94,6 +95,8 @@ that will fit all characters, yet is, approximately, as small as possible.
  */
 unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height);
 
+void print_help();
+
 /*
   FreeType-Check
 
@@ -111,6 +114,8 @@ unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height);
 #define START_CHAR 32
 #define END_CHAR 95 // 90
 
+#define FONT_SIZE_DEFALT 64
+
 
 /*
   Global variables.
@@ -118,9 +123,46 @@ unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height);
 unsigned int atlas_width;
 unsigned int atlas_height;
 
-int main() {
+int main(int argc, char *argv[] ) {
 
-    const FT_F26Dot6 font_size = 64;
+    // the font size to use for the atlas.
+    FT_F26Dot6 font_size = FONT_SIZE_DEFALT;
+
+
+    /*
+      Parse command line arguments:
+     */
+
+    if(argc < 2) { // not enough arguments.
+	print_help();
+	exit(1);
+    }
+
+    for (int i = 1; i < argc; i++) {
+
+	if(strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0  ) {
+	    print_help();
+	    exit(0);
+	} else if(strcmp(argv[i], "-fs") == 0 || strcmp(argv[i], "--font-size") == 0  ) {
+	    if( (i+1) == argc ) {
+		printf("ERROR: no font size has been provided\n");
+		exit(1);
+	    }
+
+	    font_size = strtol(argv[i+1], NULL, 10);
+
+	    if(font_size == 0) {
+		printf("ERROR: invalid font size specified.\n");
+		exit(1);
+	    }
+
+	    // skip the number.
+	    ++i;
+	}
+    }
+
+    // last arguent is input file
+    const string input_file = string(argv[argc-1]);
 
 
     FT_Library  library;
@@ -135,7 +177,6 @@ int main() {
       Load the font file.
      */
 
-    const string input_file = "../Ubuntu-B.ttf";
 
     // all files outputted by this program will start with this string.
     const string output_file_prefix = strip_file_extension(input_file);
@@ -206,7 +247,6 @@ int main() {
 	atlas_buffer[4*i + 2] = 255;
 	atlas_buffer[4*i + 3] = 0;
     }
-
 
 
 
@@ -357,5 +397,17 @@ unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height) {
 
 
     return atlas_size;
+
+}
+
+void print_help() {
+    printf("Usage:\n");
+    printf("font_creator_cpp [FLAGS] input-file\n\n");
+
+    printf("Flags:\n");
+
+
+    printf("\t-h,--help\t\tPrint this message\n");
+    printf( "\t-fs,--font-size\t\tFont size. Default value: %d\n", FONT_SIZE_DEFALT );
 
 }
