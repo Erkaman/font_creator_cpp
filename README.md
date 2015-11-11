@@ -27,3 +27,8 @@ Usage
 ==============
 
 TODO
+
+TODO
+==============
+
+* The program does not yet support italic fonts.
