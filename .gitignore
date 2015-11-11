@@ -4,3 +4,4 @@ a.out
 *.amf
 *.dSym/
 build/
+makefile
