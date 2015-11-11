@@ -215,35 +215,14 @@ int main(int argc, char *argv[] ) {
 
     unsigned int max_width = 0;
     unsigned int max_height = 0;
-    signed int max_bitmap_top;
-    signed int descender = 0;
+    signed int max_bitmap_top = 0;
 
     for(unsigned int ch = START_CHAR; ch <= END_CHAR; ++ch) {
 
 	FT_C(FT_Load_Char(face, (char)ch, FT_LOAD_RENDER));
 
-
-
-
 	FT_GlyphSlot glyph = face->glyph;
 	FT_Bitmap bitmap = glyph->bitmap;
-
-	printf("ch: %c\n", ch);
-
-	// this value can be negative, but is often positive.
-	printf("bitmap_left: %d\n", glyph->bitmap_left);
-
-	// can be negative, but is often positive
-	printf("bitmap_top: %d\n", glyph->bitmap_top);
-
-	// always positive.
-	printf("penx: %d\n", glyph->advance.x >> 6);
-
-	// always positive.
-	printf("rows: %d\n", bitmap.rows);
-
-
-	printf("\n");
 
 	if(bitmap.rows > max_height) {
 	    max_height = bitmap.rows;
@@ -255,21 +234,14 @@ int main(int argc, char *argv[] ) {
 
 	if(glyph->bitmap_top > max_bitmap_top) {
 	    max_bitmap_top = glyph->bitmap_top;
-
-	    printf("new max_bitmap_top: %d\n", max_bitmap_top);
-
-	}
-
-	if(bitmap.rows- glyph->bitmap_top > descender) {
-	    descender = bitmap.rows- glyph->bitmap_top;
 	}
     }
 
-    atlas_width = find_atlas_size(max_width, max_height);
+    atlas_width = find_atlas_size(
+	max_width, // maximum character width
+	max_height+ abs(max_bitmap_top) // maximum character height
+	);
     atlas_height = atlas_width;
-
-
-    printf("max_bitmap_top: %d\n", max_bitmap_top);
 
 
     /*
@@ -281,6 +253,8 @@ int main(int argc, char *argv[] ) {
     //contains RGBA values, with a byte for each channel.
     unsigned char* atlas_buffer = new unsigned char[atlas_num_pixels * 4];
 
+    printf("size buffer: %d\n", atlas_width);
+
     // initially, set all atlas pixels to fully transparent white: (1,1,1,0).
     for(int i = 0; i < atlas_num_pixels; ++i) {
 	atlas_buffer[4*i + 0] = 255;
@@ -289,9 +263,8 @@ int main(int argc, char *argv[] ) {
 	atlas_buffer[4*i + 3] = 0;
     }
 
+    // The .amf-file will contain the exact positions of every character in the atlas.
     FILE* fp = fopen((output_file_prefix+string(".amf")).c_str(), "w");
-
-    //unsigned int max_height = max_bitmap_top + max_rows;
 
     unsigned int atlas_x = 0;
     unsigned int atlas_y = 0;
@@ -307,20 +280,15 @@ int main(int argc, char *argv[] ) {
 	const unsigned int bitmap_height = bitmap.rows;
 
 	// start a new row, if the current one is already filled.
-	if(bitmap_width + atlas_x > atlas_width) {
+	if(max_width + atlas_x > atlas_width) {
 	    atlas_x = 0;
 
+	    // if we do this, we are guaranteed that the rows are spaced apart enough.
 	    atlas_y += max_height+ abs(max_bitmap_top);
 	}
 
-
-	// ensure that the characters are not crammed together
-//	atlas_x += glyph->bitmap_left;
-
-	copy_font_bitmap(atlas_buffer, bitmap, atlas_x, atlas_y + (max_bitmap_top - glyph->bitmap_top )
-
-			 /*+ max_bitmap_top - glyph->bitmap_top*/
-	    );
+	// when copying the font, we make sure to align the baselines of all the characters.
+	copy_font_bitmap(atlas_buffer, bitmap, atlas_x, atlas_y + (max_bitmap_top - glyph->bitmap_top ));
 
 	string line =
 	    string(1,(char)ch) + "," +
@@ -334,7 +302,7 @@ int main(int argc, char *argv[] ) {
 	fputs(line.c_str(), fp);
 
 	// move to the next letter.
-	atlas_x += max_width;//(glyph->advance.x >> 6) + abs(glyph->bitmap_left);
+	atlas_x += max_width;
     }
 
     unsigned int error = lodepng_encode32_file((output_file_prefix+string(".png")).c_str(), atlas_buffer, atlas_width, atlas_height);
@@ -353,7 +321,7 @@ int main(int argc, char *argv[] ) {
     delete[] atlas_buffer;
     FT_C(FT_Done_FreeType( library ));
 
-    system(("open " + output_file_prefix+string(".png")).c_str() );
+     system(("open " + output_file_prefix+string(".png")).c_str() );
 }
 
 void check_ft_error(const FT_Error error, const char* filename, const int line) {
@@ -423,7 +391,11 @@ unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height) {
 	// total amount of vertical space required for all characters.
 	unsigned int total_width = max_width * (END_CHAR - START_CHAR);
 
-	unsigned int rows = total_width / atlas_size;
+	printf("total_width: %d\n", total_width);
+	printf("max_width: %d\n", max_width);
+
+	// we round upwards, so add 1.
+	unsigned int rows = (total_width / atlas_size) + 1;
 
 	if(rows * max_height < atlas_size) {
 	    // enough rows. So we found an atlas size big enough.

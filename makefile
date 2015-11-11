@@ -1,2 +1,2 @@
 ll:
-	cd build && make && ./font_creator_cpp -fs 64 ../Ubuntu-B.ttf
+	cd build && make && ./font_creator_cpp -fs 80 ../UbuntuMono-B.ttf
