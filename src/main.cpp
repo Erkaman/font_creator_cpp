@@ -253,8 +253,6 @@ int main(int argc, char *argv[] ) {
     //contains RGBA values, with a byte for each channel.
     unsigned char* atlas_buffer = new unsigned char[atlas_num_pixels * 4];
 
-    printf("size buffer: %d\n", atlas_width);
-
     // initially, set all atlas pixels to fully transparent white: (1,1,1,0).
     for(int i = 0; i < atlas_num_pixels; ++i) {
 	atlas_buffer[4*i + 0] = 255;
@@ -390,9 +388,6 @@ unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height) {
 
 	// total amount of vertical space required for all characters.
 	unsigned int total_width = max_width * (END_CHAR - START_CHAR);
-
-	printf("total_width: %d\n", total_width);
-	printf("max_width: %d\n", max_width);
 
 	// we round upwards, so add 1.
 	unsigned int rows = (total_width / atlas_size) + 1;
