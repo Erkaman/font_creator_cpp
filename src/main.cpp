@@ -358,7 +358,7 @@ void copy_font_bitmap(unsigned char atlas_buffer[], FT_Bitmap bitmap,
 	unsigned char a = bitmap.buffer[bitmap_i];
 
 	atlas_buffer[atlas_i + 0] = 255;
-	atlas_buffer[atlas_i + 1] = 0;
+	atlas_buffer[atlas_i + 1] = 255;
 	atlas_buffer[atlas_i + 2] = 255;
 	atlas_buffer[atlas_i + 3] = a;
 
