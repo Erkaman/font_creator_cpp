@@ -334,7 +334,7 @@ int main(int argc, char *argv[] ) {
 	fputs(line.c_str(), fp);
 
 	// move to the next letter.
-	atlas_x += (glyph->advance.x >> 6) + abs(glyph->bitmap_left);
+	atlas_x += max_width;//(glyph->advance.x >> 6) + abs(glyph->bitmap_left);
     }
 
     unsigned int error = lodepng_encode32_file((output_file_prefix+string(".png")).c_str(), atlas_buffer, atlas_width, atlas_height);
