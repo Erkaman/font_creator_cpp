@@ -216,6 +216,7 @@ int main(int argc, char *argv[] ) {
     unsigned int max_width = 0;
     unsigned int max_height = 0;
     signed int max_bitmap_top;
+    signed int descender = 0;
 
     for(unsigned int ch = START_CHAR; ch <= END_CHAR; ++ch) {
 
@@ -238,6 +239,9 @@ int main(int argc, char *argv[] ) {
 	// always positive.
 	printf("penx: %d\n", glyph->advance.x >> 6);
 
+	// always positive.
+	printf("rows: %d\n", bitmap.rows);
+
 
 	printf("\n");
 
@@ -254,6 +258,10 @@ int main(int argc, char *argv[] ) {
 
 	    printf("new max_bitmap_top: %d\n", max_bitmap_top);
 
+	}
+
+	if(bitmap.rows- glyph->bitmap_top > descender) {
+	    descender = bitmap.rows- glyph->bitmap_top;
 	}
     }
 
@@ -302,7 +310,7 @@ int main(int argc, char *argv[] ) {
 	if(bitmap_width + atlas_x > atlas_width) {
 	    atlas_x = 0;
 
-	    atlas_y += max_height;
+	    atlas_y += max_height+ abs(max_bitmap_top);
 	}
 
 
@@ -425,8 +433,6 @@ unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height) {
 	atlas_size *= 2;
     }
 
-//    return 2048;
-
     return atlas_size;
 
 }
@@ -442,31 +448,3 @@ void print_help() {
     printf( "\t-fs,--font-size\t\tFont size. Default value: %d\n", FONT_SIZE_DEFALT );
 
 }
-
-
-/*
-
-ch: k
-bitmap_left: 4
-bitmap_top: 50
-penx: 37
-
-
-ch: m
-bitmap_left: 4
-bitmap_top: 35
-penx: 56
-
- */
-
-
-/*
-
-f,658,124,23,51
-
-p,0,186,35,63
-q,43,186,36,63
-r,85,186,23,51
-s,116,186,29,52
-
-*/
