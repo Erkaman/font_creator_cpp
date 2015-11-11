@@ -111,8 +111,15 @@ void print_help();
 // horizontal and vertical resolution in DPI
 #define RESOLUTION 72
 
+
 #define START_CHAR 32
+#define END_CHAR 126 // 90
+
+
+/*
+#define START_CHAR 100
 #define END_CHAR 120 // 90
+*/
 
 #define FONT_SIZE_DEFALT 64
 
@@ -208,14 +215,31 @@ int main(int argc, char *argv[] ) {
 
     unsigned int max_width = 0;
     unsigned int max_height = 0;
-    unsigned int max_bitmap_top;
+    signed int max_bitmap_top;
 
     for(unsigned int ch = START_CHAR; ch <= END_CHAR; ++ch) {
 
 	FT_C(FT_Load_Char(face, (char)ch, FT_LOAD_RENDER));
 
+
+
+
 	FT_GlyphSlot glyph = face->glyph;
 	FT_Bitmap bitmap = glyph->bitmap;
+
+	printf("ch: %c\n", ch);
+
+	// this value can be negative, but is often positive.
+	printf("bitmap_left: %d\n", glyph->bitmap_left);
+
+	// can be negative, but is often positive
+	printf("bitmap_top: %d\n", glyph->bitmap_top);
+
+	// always positive.
+	printf("penx: %d\n", glyph->advance.x >> 6);
+
+
+	printf("\n");
 
 	if(bitmap.rows > max_height) {
 	    max_height = bitmap.rows;
@@ -227,12 +251,17 @@ int main(int argc, char *argv[] ) {
 
 	if(glyph->bitmap_top > max_bitmap_top) {
 	    max_bitmap_top = glyph->bitmap_top;
+
+	    printf("new max_bitmap_top: %d\n", max_bitmap_top);
+
 	}
     }
 
     atlas_width = find_atlas_size(max_width, max_height);
     atlas_height = atlas_width;
 
+
+    printf("max_bitmap_top: %d\n", max_bitmap_top);
 
 
     /*
@@ -251,8 +280,6 @@ int main(int argc, char *argv[] ) {
 	atlas_buffer[4*i + 2] = 255;
 	atlas_buffer[4*i + 3] = 0;
     }
-
-
 
     FILE* fp = fopen((output_file_prefix+string(".amf")).c_str(), "w");
 
@@ -275,15 +302,14 @@ int main(int argc, char *argv[] ) {
 	if(bitmap_width + atlas_x > atlas_width) {
 	    atlas_x = 0;
 
-	    atlas_y += max_height/*+ROW_SPACING*/;
+	    atlas_y += max_height;
 	}
 
-//	printf("ch: %c, %d\n", (char)ch, glyph->bitmap_left);
 
 	// ensure that the characters are not crammed together
 //	atlas_x += glyph->bitmap_left;
 
-	copy_font_bitmap(atlas_buffer, bitmap, atlas_x, atlas_y
+	copy_font_bitmap(atlas_buffer, bitmap, atlas_x, atlas_y + (max_bitmap_top - glyph->bitmap_top )
 
 			 /*+ max_bitmap_top - glyph->bitmap_top*/
 	    );
@@ -292,19 +318,16 @@ int main(int argc, char *argv[] ) {
 	    string(1,(char)ch) + "," +
 	    std::to_string(atlas_x) + "," +
 	    std::to_string(atlas_y) + "," +
-	    std::to_string(bitmap_width) + "," +
-	    std::to_string(bitmap_height) +
-
+	    std::to_string( (glyph->advance.x >> 6) - glyph->bitmap_left ) + "," +
+	    std::to_string( max_height) + "," +
+	    std::to_string( glyph->bitmap_left) +
 	    "\n";
 
 	fputs(line.c_str(), fp);
 
 	// move to the next letter.
-	atlas_x += max_width;
+	atlas_x += (glyph->advance.x >> 6) + abs(glyph->bitmap_left);
     }
-
-
-
 
     unsigned int error = lodepng_encode32_file((output_file_prefix+string(".png")).c_str(), atlas_buffer, atlas_width, atlas_height);
 
@@ -402,6 +425,7 @@ unsigned int find_atlas_size(unsigned int max_width, unsigned int max_height) {
 	atlas_size *= 2;
     }
 
+//    return 2048;
 
     return atlas_size;
 
@@ -418,3 +442,31 @@ void print_help() {
     printf( "\t-fs,--font-size\t\tFont size. Default value: %d\n", FONT_SIZE_DEFALT );
 
 }
+
+
+/*
+
+ch: k
+bitmap_left: 4
+bitmap_top: 50
+penx: 37
+
+
+ch: m
+bitmap_left: 4
+bitmap_top: 35
+penx: 56
+
+ */
+
+
+/*
+
+f,658,124,23,51
+
+p,0,186,35,63
+q,43,186,36,63
+r,85,186,23,51
+s,116,186,29,52
+
+*/
