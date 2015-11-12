@@ -33,7 +33,7 @@ The program can be used to create a font atlas as follows:
 ```
 
 which creates a font atlas of the font Ubuntu-B.ttf, and the font size is 80. Running the command creates two files 
-`Ubuntu-B-80.png` and `Ubuntu-B-80.amf`. `Ubuntu-B-80.png` is the simply the font atlas image:
+`Ubuntu-B-80.png` and `Ubuntu-B-80.amf`. `Ubuntu-B-80.png` is simply the font atlas image:
 
 ![text](img/Ubuntu-B-80.png)
 
